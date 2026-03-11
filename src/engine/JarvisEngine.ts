@@ -145,7 +145,7 @@ export class JarvisEngine {
   }
 
   /** Process user input through LLM + tools + streaming TTS */
-  private async processInput(text: string): Promise<string> {
+  private async processInput(text: string, retryCount = 0): Promise<string> {
     this.updateState({ status: 'thinking', transcript: text });
 
     this.history.push({ role: 'user', content: text });
@@ -254,10 +254,19 @@ export class JarvisEngine {
       this.updateState({ response, status: 'idle' });
       return response;
     } catch (err) {
-      if (err instanceof Error && err.message.includes('rate')) {
-        // Rate limit — mark provider failed and retry
-        const llm = await this.llmChain.resolve().catch(() => null);
-        if (llm) this.llmChain.markFailed(llm.name);
+      // Mark failed provider and retry with next in chain (max 3 retries)
+      if (retryCount < 3) {
+        const failedLLM = await this.llmChain.resolve().catch(() => null);
+        if (failedLLM) {
+          this.llmChain.markFailed(failedLLM.name);
+          // Pop the failed user message so retry doesn't double it
+          this.history.pop();
+          try {
+            return await this.processInput(text, retryCount + 1);
+          } catch {
+            // All providers exhausted — fall through to error
+          }
+        }
       }
       this.handleError(err);
       return '';

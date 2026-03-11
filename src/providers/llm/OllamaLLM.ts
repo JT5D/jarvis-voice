@@ -31,7 +31,10 @@ export class OllamaLLM implements LLMProvider {
       stream: true,
     };
 
-    if (tools?.length) {
+    // Only pass tools to models that handle them well (≥8B)
+    const smallModels = ['llama3.2', 'gemma:2b', 'phi3:mini', 'qwen2.5:7b'];
+    const isSmall = smallModels.some(s => this.model.startsWith(s));
+    if (tools?.length && !isSmall) {
       body.tools = tools.map(t => ({
         type: 'function',
         function: { name: t.name, description: t.description, parameters: { type: 'object', properties: t.parameters } },

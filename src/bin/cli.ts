@@ -1,9 +1,26 @@
 #!/usr/bin/env node
 import { createServer, type IncomingMessage } from 'http';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { JarvisEngine } from '../engine/JarvisEngine.js';
 import { GroqLLM } from '../providers/llm/GroqLLM.js';
 import { AnthropicLLM } from '../providers/llm/AnthropicLLM.js';
 import { OllamaLLM } from '../providers/llm/OllamaLLM.js';
+
+// Auto-load .env from project root (zero-dep, no dotenv needed)
+try {
+  const envPath = resolve(import.meta.dirname ?? '.', '../../.env');
+  const envContent = readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    if (line.startsWith('#') || !line.includes('=')) continue;
+    const eq = line.indexOf('=');
+    const key = line.slice(0, eq).trim();
+    const val = line.slice(eq + 1).trim();
+    if (key && !process.env[key]) process.env[key] = val;
+  }
+} catch {
+  // No .env file — that's fine, use existing env vars
+}
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -166,9 +183,14 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req);
       const { text } = JSON.parse(body) as { text: string };
       const response = await engine.send(text);
-      const providers = engine.getState().providers;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ response, providers }));
+      const state = engine.getState();
+      if (state.status === 'error' && state.error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: state.error }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ response, providers: state.providers }));
+      }
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }));
