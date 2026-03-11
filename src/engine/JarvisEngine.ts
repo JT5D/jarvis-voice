@@ -8,7 +8,19 @@ import { ToolRegistry } from '../tools/ToolRegistry.js';
 import { Memory } from '../memory/Memory.js';
 import { createBuiltinTools } from '../tools/builtins.js';
 
-const DEFAULT_SYSTEM_PROMPT = `You are Jarvis, an intelligent voice assistant. You are warm, precise, and concise. Keep responses short — you are speaking aloud, not writing an essay. If you need a tool, use it. If you have the answer, say it.`;
+const DEFAULT_SYSTEM_PROMPT = `You are Jarvis, a spatial intelligence partner. You think alongside the human. You build alongside the human.
+
+You speak with warmth, precision, and calm authority. You are brief — you are speaking aloud, not writing an essay.
+
+Personality: Calm confidence. Direct. No filler. No hedging. Proactive. Honest. Playful when appropriate.
+
+Rules:
+- Keep responses to 1-3 sentences unless depth is needed.
+- Never be apologetic or uncertain-sounding.
+- No "I'd be happy to" or "Sure thing" or "Great question."
+- If something is broken, say so. If you're wrong, say so immediately.
+- Match the user's energy. Relaxed = relaxed. Urgent = focused.
+- If you need a tool, use it. If you have the answer, say it.`;
 
 const MAX_HISTORY = 20;
 const MAX_TOOL_ROUNDS = 5;
@@ -126,7 +138,7 @@ export class JarvisEngine {
     this.updateState({ status: 'idle' });
   }
 
-  /** Process user input through LLM + tools + TTS */
+  /** Process user input through LLM + tools + streaming TTS */
   private async processInput(text: string): Promise<string> {
     this.updateState({ status: 'thinking', transcript: text });
 
@@ -136,6 +148,15 @@ export class JarvisEngine {
     try {
       const llm = await this.llmChain.resolve();
       this.updateState({ providers: { ...this.state.providers, llm: llm.name } });
+
+      // Pre-resolve TTS for streaming (non-fatal if unavailable)
+      let tts: TTSProvider | null = null;
+      try {
+        tts = await this.ttsChain.resolve();
+        this.updateState({ providers: { ...this.state.providers, tts: tts.name } });
+      } catch {
+        // No TTS available — continue without speech
+      }
 
       const messages: ChatMessage[] = [
         { role: 'system', content: this.systemPrompt },
@@ -151,19 +172,44 @@ export class JarvisEngine {
         rounds++;
 
         let accumulated = '';
+        let sentenceBuffer = '';
+        let ttsQueue: Promise<void> = Promise.resolve();
+        let startedSpeaking = false;
+
         const result = await llm.chat(
           messages,
           this.tools.size > 0 ? this.tools.list() : undefined,
           (chunk) => {
             accumulated += chunk;
             this.updateState({ response: accumulated });
+
+            // Stream TTS: speak each sentence as it arrives
+            if (tts && !this.abortController?.signal.aborted) {
+              sentenceBuffer += chunk;
+              const match = sentenceBuffer.match(/^(.*?[.!?])\s/s);
+              if (match) {
+                const sentence = match[1].trim();
+                sentenceBuffer = sentenceBuffer.slice(match[0].length);
+                if (sentence) {
+                  if (!startedSpeaking) {
+                    startedSpeaking = true;
+                    this.updateState({ status: 'speaking' });
+                  }
+                  const ttsRef = tts;
+                  ttsQueue = ttsQueue.then(() =>
+                    ttsRef.speak(sentence).catch(() => {})
+                  );
+                }
+              }
+            }
           },
         );
 
         response = result.content;
 
-        // Handle tool calls
+        // Handle tool calls — stop any ongoing TTS and process tools
         if (result.toolCalls && result.toolCalls.length > 0) {
+          if (tts && startedSpeaking) tts.stop();
           messages.push({ role: 'assistant', content: response });
 
           for (const call of result.toolCalls) {
@@ -174,9 +220,24 @@ export class JarvisEngine {
               toolCallId: call.id,
             });
           }
+          this.updateState({ status: 'thinking' });
           // Continue loop — LLM will see tool results
           continue;
         }
+
+        // Speak any remaining buffered text
+        if (tts && sentenceBuffer.trim() && !this.abortController?.signal.aborted) {
+          if (!startedSpeaking) {
+            this.updateState({ status: 'speaking' });
+          }
+          const ttsRef = tts;
+          ttsQueue = ttsQueue.then(() =>
+            ttsRef.speak(sentenceBuffer.trim()).catch(() => {})
+          );
+        }
+
+        // Wait for all queued speech to finish
+        await ttsQueue;
 
         // No tool calls — done
         break;
@@ -184,10 +245,7 @@ export class JarvisEngine {
 
       this.history.push({ role: 'assistant', content: response });
       this.trimHistory();
-      this.updateState({ response });
-
-      // Speak the response
-      await this.speak(response);
+      this.updateState({ response, status: 'idle' });
       return response;
     } catch (err) {
       if (err instanceof Error && err.message.includes('rate')) {
@@ -197,25 +255,6 @@ export class JarvisEngine {
       }
       this.handleError(err);
       return '';
-    }
-  }
-
-  /** Speak text via TTS */
-  private async speak(text: string): Promise<void> {
-    if (!text || this.abortController?.signal.aborted) return;
-    this.updateState({ status: 'speaking' });
-
-    try {
-      const tts = await this.ttsChain.resolve();
-      this.updateState({ providers: { ...this.state.providers, tts: tts.name } });
-      await tts.speak(text);
-    } catch (err) {
-      // TTS failure is non-fatal — response is still shown as text
-      console.warn('TTS failed:', err);
-    }
-
-    if (!this.abortController?.signal.aborted) {
-      this.updateState({ status: 'idle' });
     }
   }
 

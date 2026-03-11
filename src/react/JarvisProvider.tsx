@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useRef } from 'react';
 import type { JarvisConfig } from '../types.js';
 import { createJarvis } from '../create.js';
 import { JarvisEngine } from '../engine/JarvisEngine.js';
@@ -20,11 +20,12 @@ export interface JarvisProviderProps {
 export function JarvisProvider({ config, engine: externalEngine, children }: JarvisProviderProps) {
   const engineRef = useRef<JarvisEngine | null>(externalEngine ?? null);
 
-  const engine = useMemo(() => {
-    if (externalEngine) return externalEngine;
-    if (!engineRef.current) engineRef.current = createJarvis(config ?? {});
-    return engineRef.current;
-  }, [externalEngine, config]);
+  // Create engine once on first render; config changes after mount are ignored
+  if (!engineRef.current) {
+    engineRef.current = createJarvis(config ?? {});
+  }
+
+  const engine = externalEngine ?? engineRef.current;
 
   return <JarvisContext.Provider value={engine}>{children}</JarvisContext.Provider>;
 }
