@@ -145,6 +145,73 @@ describe('JarvisEngine', () => {
     expect(infiniteLLM.chat).toHaveBeenCalledTimes(3);
   });
 
+  it('interrupts TTS when stop() is called', async () => {
+    const slowTTS = mockTTS();
+    (slowTTS.speak as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise(resolve => setTimeout(resolve, 100))
+    );
+    const interruptEngine = new JarvisEngine({ stt: [stt], tts: [slowTTS], llm: [llm] });
+
+    await interruptEngine.send('first');
+    interruptEngine.stop();
+    // stop() fires tts.stop() asynchronously — flush microtask queue
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(slowTTS.stop).toHaveBeenCalled();
+  });
+
+  it('returns to idle after stop()', async () => {
+    await engine.send('hello');
+    engine.stop();
+    expect(engine.getState().status).toBe('idle');
+  });
+
+  it('streams TTS on sentence boundaries', async () => {
+    // LLM streams "First sentence. Second part"
+    const streamLLM: LLMProvider = {
+      name: 'StreamLLM',
+      available: vi.fn().mockResolvedValue(true),
+      chat: vi.fn().mockImplementation(async (
+        _msgs: ChatMessage[], _tools?: ToolSchema[], onChunk?: (chunk: string) => void
+      ): Promise<LLMResponse> => {
+        onChunk?.('First sentence. ');
+        onChunk?.('Second part');
+        return { content: 'First sentence. Second part' };
+      }),
+    };
+    const streamEngine = new JarvisEngine({ stt: [stt], tts: [tts], llm: [streamLLM] });
+    await streamEngine.send('test');
+
+    // TTS should be called twice: once for "First sentence" (sentence boundary),
+    // once for "Second part" (remaining buffer)
+    expect(tts.speak).toHaveBeenCalledTimes(2);
+    expect(tts.speak).toHaveBeenCalledWith('First sentence.');
+    expect(tts.speak).toHaveBeenCalledWith('Second part');
+  });
+
+  it('does not speak tool call content', async () => {
+    let callCount = 0;
+    const toolLLM2: LLMProvider = {
+      name: 'ToolLLM2',
+      available: vi.fn().mockResolvedValue(true),
+      chat: vi.fn().mockImplementation(async (
+        _msgs: ChatMessage[], _tools?: ToolSchema[], onChunk?: (chunk: string) => void
+      ): Promise<LLMResponse> => {
+        callCount++;
+        if (callCount === 1) {
+          onChunk?.('checking');
+          return { content: 'checking', toolCalls: [{ id: 'tc1', name: 'get_time', args: {} }] };
+        }
+        onChunk?.('Done.');
+        return { content: 'Done.' };
+      }),
+    };
+    const toolEngine2 = new JarvisEngine({ stt: [stt], tts: [tts], llm: [toolLLM2] });
+    await toolEngine2.send('time?');
+
+    // TTS should only speak the final response, not the tool-call round
+    expect(tts.speak).toHaveBeenCalledWith('Done.');
+  });
+
   it('trims conversation history', async () => {
     const shortEngine = new JarvisEngine({
       stt: [stt], tts: [tts], llm: [llm],

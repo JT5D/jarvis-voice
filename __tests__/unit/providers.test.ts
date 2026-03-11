@@ -133,6 +133,23 @@ describe('ElevenLabsTTS', () => {
     const tts = new ElevenLabsTTS('test-key');
     expect(() => tts.stop()).not.toThrow();
   });
+
+  it('stop is idempotent', () => {
+    const tts = new ElevenLabsTTS('test-key');
+    tts.stop();
+    tts.stop();
+    expect(() => tts.stop()).not.toThrow();
+  });
+
+  it('accepts custom voice ID', () => {
+    const tts = new ElevenLabsTTS('key', 'custom-voice-id');
+    expect(tts.name).toBe('ElevenLabsTTS');
+  });
+
+  it('speak returns immediately for empty text', async () => {
+    const tts = new ElevenLabsTTS('test-key');
+    await expect(tts.speak('')).resolves.toBeUndefined();
+  });
 });
 
 describe('ExpoSpeechSTT', () => {
