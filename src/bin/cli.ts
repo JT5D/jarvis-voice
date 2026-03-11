@@ -75,11 +75,10 @@ const server = createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  const url = \`http://localhost:\${PORT}\`;
-  console.log(\`Jarvis Voice running at \${url}\`);
-  // Open browser
+  const url = `http://localhost:${PORT}`;
+  console.log(`Jarvis Voice running at ${url}`);
   import('child_process').then(({ exec }) => {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-    exec(\`\${cmd} \${url}\`);
+    exec(`${cmd} ${url}`);
   });
 });
