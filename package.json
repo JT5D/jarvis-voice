@@ -1,5 +1,5 @@
 {
-  "name": "@jarvis/voice",
+  "name": "@jt5d/jarvis-voice",
   "version": "0.1.0",
   "description": "Standalone live voice chat agent — zero config, free-first, works in browser + React Native",
   "type": "module",
