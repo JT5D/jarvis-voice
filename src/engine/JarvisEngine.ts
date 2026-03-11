@@ -84,8 +84,11 @@ export class JarvisEngine {
     return { ...this.state };
   }
 
-  /** Start listening via STT */
+  /** Start listening via STT — interrupts TTS if currently speaking */
   async startListening(): Promise<void> {
+    if (this.state.status === 'speaking') {
+      try { const tts = await this.ttsChain.resolve(); tts.stop(); } catch { /* ignore */ }
+    }
     this.abort();
     this.abortController = new AbortController();
     this.updateState({ status: 'listening', transcript: '', response: '', error: undefined });
@@ -120,8 +123,11 @@ export class JarvisEngine {
     }
   }
 
-  /** Send text input directly (bypass STT) */
+  /** Send text input directly (bypass STT) — interrupts TTS if speaking */
   async send(text: string): Promise<string> {
+    if (this.state.status === 'speaking') {
+      try { const tts = await this.ttsChain.resolve(); tts.stop(); } catch { /* ignore */ }
+    }
     this.abort();
     this.abortController = new AbortController();
     return this.processInput(text);

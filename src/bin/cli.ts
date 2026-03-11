@@ -141,7 +141,7 @@ const HTML = [
   'btn.onclick = function() {',
   '  if (currentState === "listening") { stopListening(); }',
   '  else if (currentState === "idle" || currentState === "error") { startListening(); }',
-  '  else if (currentState === "speaking") { speechSynthesis.cancel(); setState("idle"); }',
+  '  else if (currentState === "speaking") { speechSynthesis.cancel(); startListening(); }',
   '};',
   '',
   'setState("idle");',
