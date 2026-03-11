@@ -25,24 +25,44 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
+    "test:e2e": "npm run build && npx playwright test",
     "prepublishOnly": "npm run build"
   },
   "files": [
     "dist",
     "README.md"
   ],
-  "keywords": ["voice", "chat", "jarvis", "ai", "agent", "stt", "tts", "react-native", "ollama"],
+  "keywords": [
+    "voice",
+    "chat",
+    "jarvis",
+    "ai",
+    "agent",
+    "stt",
+    "tts",
+    "react-native",
+    "ollama"
+  ],
   "license": "MIT",
   "peerDependencies": {
     "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "react-native": { "optional": true },
-    "expo-speech": { "optional": true },
-    "expo-av": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    },
+    "expo-speech": {
+      "optional": true
+    },
+    "expo-av": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.0",
     "jsdom": "^25.0.0",

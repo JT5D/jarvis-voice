@@ -12,10 +12,12 @@ export { Memory } from './memory/Memory.js';
 // Providers — STT
 export { WebSpeechSTT } from './providers/stt/WebSpeechSTT.js';
 export { GroqWhisperSTT } from './providers/stt/GroqWhisperSTT.js';
+export { ExpoSpeechSTT } from './providers/stt/ExpoSpeechSTT.js';
 
 // Providers — TTS
 export { WebSpeechTTS } from './providers/tts/WebSpeechTTS.js';
 export { ElevenLabsTTS } from './providers/tts/ElevenLabsTTS.js';
+export { ExpoSpeechTTS } from './providers/tts/ExpoSpeechTTS.js';
 
 // Providers — LLM
 export { OllamaLLM } from './providers/llm/OllamaLLM.js';

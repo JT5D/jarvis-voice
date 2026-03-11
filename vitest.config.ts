@@ -1,6 +1,13 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Stub out optional native peer deps so Vite doesn't fail on import analysis
+      'expo-speech-recognition': new URL('./__tests__/stubs/expo-speech-recognition.ts', import.meta.url).pathname,
+      'expo-speech': new URL('./__tests__/stubs/expo-speech.ts', import.meta.url).pathname,
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

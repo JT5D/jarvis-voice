@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jarvis Voice E2E</title>
+</head>
+<body>
+<div id="app">
+  <div id="status">idle</div>
+  <div id="transcript"></div>
+  <div id="response"></div>
+  <div id="providers"></div>
+  <button id="btn-listen">Start Listening</button>
+  <button id="btn-stop">Stop</button>
+  <button id="btn-send">Send Text</button>
+  <input id="text-input" type="text" placeholder="Type a message..." />
+</div>
+
+<script type="module">
+  // Import the built engine
+  import { JarvisEngine } from '/dist/engine/JarvisEngine.js';
+  import { ProviderChain } from '/dist/engine/ProviderChain.js';
+  import { ToolRegistry } from '/dist/tools/ToolRegistry.js';
+  import { Memory } from '/dist/memory/Memory.js';
+
+  // Create a mock LLM for E2E (no real API calls)
+  const mockLLM = {
+    name: 'MockLLM',
+    available: async () => true,
+    chat: async (messages, tools, onChunk) => {
+      const userMsg = messages.filter(m => m.role === 'user').pop();
+      const reply = 'Echo: ' + (userMsg?.content ?? 'empty');
+      if (onChunk) onChunk(reply);
+      return { content: reply };
+    },
+  };
+
+  // Create a mock STT that simulates speech recognition
+  let sttCallback = null;
+  const mockSTT = {
+    name: 'MockSTT',
+    available: async () => true,
+    startListening: async (onResult) => { sttCallback = onResult; },
+    stopListening: async () => {
+      const text = 'simulated speech input';
+      if (sttCallback) sttCallback(text, true);
+      sttCallback = null;
+      return text;
+    },
+  };
+
+  // Create a mock TTS
+  const mockTTS = {
+    name: 'MockTTS',
+    available: async () => true,
+    speak: async (text) => { /* noop for test speed */ },
+    stop: () => {},
+  };
+
+  const engine = new JarvisEngine({
+    stt: [mockSTT],
+    tts: [mockTTS],
+    llm: [mockLLM],
+  });
+
+  // Wire up UI
+  const statusEl = document.getElementById('status');
+  const transcriptEl = document.getElementById('transcript');
+  const responseEl = document.getElementById('response');
+  const providersEl = document.getElementById('providers');
+
+  engine.subscribe((state) => {
+    statusEl.textContent = state.status;
+    statusEl.dataset.status = state.status;
+    transcriptEl.textContent = state.transcript;
+    responseEl.textContent = state.response;
+    if (state.error) responseEl.dataset.error = state.error;
+    const p = state.providers;
+    providersEl.textContent = [p.stt, p.llm, p.tts].filter(Boolean).join(' > ');
+  });
+
+  document.getElementById('btn-listen').onclick = () => engine.startListening();
+  document.getElementById('btn-stop').onclick = () => engine.stop();
+  document.getElementById('btn-send').onclick = async () => {
+    const input = document.getElementById('text-input');
+    if (input.value.trim()) {
+      await engine.send(input.value.trim());
+      input.value = '';
+    }
+  };
+
+  // Expose engine globally for test assertions
+  window.__jarvis = engine;
+  window.__mockSTTCallback = () => sttCallback;
+</script>
+</body>
+</html>
