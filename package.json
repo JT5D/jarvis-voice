@@ -1,0 +1,54 @@
+{
+  "name": "@jarvis/voice",
+  "version": "0.1.0",
+  "description": "Standalone live voice chat agent — zero config, free-first, works in browser + React Native",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    }
+  },
+  "bin": {
+    "jarvis-voice": "./dist/bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": ["voice", "chat", "jarvis", "ai", "agent", "stt", "tts", "react-native", "ollama"],
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-native": { "optional": true },
+    "expo-speech": { "optional": true },
+    "expo-av": { "optional": true }
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.0.0",
+    "jsdom": "^25.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
